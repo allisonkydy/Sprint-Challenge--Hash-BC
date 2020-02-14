@@ -28,6 +28,8 @@ def proof_of_work(last_proof):
 
     proof = 3838383838
     while not valid_proof(last_hash, proof):
+        if (timer() - start) > 15:
+            return "timeout"
         proof += 3
 
     print("Proof found: " + str(proof) + " in " + str(timer() - start))
@@ -76,8 +78,20 @@ if __name__ == '__main__':
             print("Error:  Non-json response")
             print("Response returned:")
             print(r)
-            break
+            continue
         new_proof = proof_of_work(data.get('proof'))
+
+        while new_proof == "timeout":
+            print("Search took longer than 15 seconds, trying again")
+            r = requests.get(url=node + "/last_proof")
+            try:
+                data = r.json()
+            except ValueError:
+                print("Error:  Non-json response")
+                print("Response returned:")
+                print(r)
+                continue
+            new_proof = proof_of_work(data.get('proof'))
 
         post_data = {"proof": new_proof,
                      "id": id}
@@ -89,7 +103,7 @@ if __name__ == '__main__':
             print("Error:  Non-json response")
             print("Response returned:")
             print(r)
-            break
+            continue
         if data.get('message') == 'New Block Forged':
             coins_mined += 1
             print("Total coins mined: " + str(coins_mined))
