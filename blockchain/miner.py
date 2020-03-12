@@ -20,11 +20,17 @@ def proof_of_work(last_proof):
     - Use the same method to generate SHA-256 hashes as the examples in class
     """
 
-    start = timer()
+    last_encoded = str(last_proof).encode()
+    last_hash = hashlib.sha256(last_encoded).hexdigest()
 
     print("Searching for next proof")
-    proof = 0
-    #  TODO: Your code here
+    start = timer()
+
+    proof = 3838383838
+    while not valid_proof(last_hash, proof):
+        if (timer() - start) > 15:
+            return "timeout"
+        proof += 3
 
     print("Proof found: " + str(proof) + " in " + str(timer() - start))
     return proof
@@ -39,8 +45,9 @@ def valid_proof(last_hash, proof):
     IE:  last_hash: ...AE9123456, new hash 123456E88...
     """
 
-    # TODO: Your code here!
-    pass
+    encoded_proof = str(proof).encode()
+    current_hash = hashlib.sha256(encoded_proof).hexdigest()
+    return last_hash[-6:] == current_hash[:6]
 
 
 if __name__ == '__main__':
@@ -65,14 +72,38 @@ if __name__ == '__main__':
     while True:
         # Get the last proof from the server
         r = requests.get(url=node + "/last_proof")
-        data = r.json()
+        try:
+            data = r.json()
+        except ValueError:
+            print("Error:  Non-json response")
+            print("Response returned:")
+            print(r)
+            continue
         new_proof = proof_of_work(data.get('proof'))
+
+        while new_proof == "timeout":
+            print("Search took longer than 15 seconds, trying again")
+            r = requests.get(url=node + "/last_proof")
+            try:
+                data = r.json()
+            except ValueError:
+                print("Error:  Non-json response")
+                print("Response returned:")
+                print(r)
+                continue
+            new_proof = proof_of_work(data.get('proof'))
 
         post_data = {"proof": new_proof,
                      "id": id}
 
         r = requests.post(url=node + "/mine", json=post_data)
-        data = r.json()
+        try:
+            data = r.json()
+        except ValueError:
+            print("Error:  Non-json response")
+            print("Response returned:")
+            print(r)
+            continue
         if data.get('message') == 'New Block Forged':
             coins_mined += 1
             print("Total coins mined: " + str(coins_mined))
